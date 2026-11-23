@@ -18,7 +18,7 @@ import { Excalidraw } from "../index";
 
 import { API } from "./helpers/api";
 import { UI } from "./helpers/ui";
-import { fireEvent, render, waitFor } from "./test-utils";
+import { fireEvent, render, waitFor, within } from "./test-utils";
 
 import type { LibraryItem, LibraryItems } from "../types";
 
@@ -271,6 +271,49 @@ describe("library menu", () => {
         expect.objectContaining(strippedElement),
       ]);
     });
+  });
+
+  it("shift-selects a range in the order of the filtered library results", async () => {
+    const { container } = await render(<Excalidraw />);
+    const library = within(container);
+    const items = [
+      ["Relay A", "published"],
+      ["Relay B", "unpublished"],
+      ["Socket", "published"],
+      ["Relay C", "published"],
+    ] as const;
+    await act(() =>
+      h.app.library.updateLibrary({
+        libraryItems: items.map(([name, status]) => ({
+          id: name,
+          name,
+          status,
+          created: 1,
+          elements: [API.createElement({ type: "rectangle", id: name })],
+        })),
+        openLibraryMenu: true,
+      }),
+    );
+
+    const searchInput = library.getByRole("searchbox");
+    fireEvent.change(searchInput, { target: { value: "relay" } });
+
+    const relayA = await library.findByText("Relay A");
+    const relayC = await library.findByText("Relay C");
+    fireEvent.click(relayA, { shiftKey: true });
+    fireEvent.click(relayC, { shiftKey: true });
+
+    expect(
+      Array.from(
+        container.querySelectorAll(
+          ".library-unit--selected .library-unit__name",
+        ),
+        (item) => item.textContent,
+      ),
+    ).toEqual(["Relay A", "Relay B", "Relay C"]);
+    expect(
+      container.querySelector(".library-actions-counter")?.textContent,
+    ).toBe("3");
   });
 });
 

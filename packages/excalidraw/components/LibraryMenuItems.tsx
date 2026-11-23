@@ -6,12 +6,7 @@ import React, {
   useState,
 } from "react";
 
-import {
-  KEYS,
-  MIME_TYPES,
-  arrayToMap,
-  nextAnimationFrame,
-} from "@excalidraw/common";
+import { KEYS, MIME_TYPES, nextAnimationFrame } from "@excalidraw/common";
 
 import { duplicateElements } from "@excalidraw/element";
 
@@ -128,47 +123,39 @@ export default function LibraryMenuItems({
 
   const onItemSelectToggle = useCallback(
     (id: LibraryItem["id"], event: React.MouseEvent) => {
-      const shouldSelect = !selectedItems.includes(id);
-      const orderedItems = [...unpublishedItems, ...publishedItems];
-      if (shouldSelect) {
-        if (event.shiftKey && lastSelectedItem) {
-          const rangeStart = orderedItems.findIndex(
-            (item) => item.id === lastSelectedItem,
-          );
-          const rangeEnd = orderedItems.findIndex((item) => item.id === id);
-
-          if (rangeStart === -1 || rangeEnd === -1) {
-            onSelectItems([...selectedItems, id]);
-            return;
-          }
-
-          const selectedItemsMap = arrayToMap(selectedItems);
-          // Support both top-down and bottom-up selection by using min/max
-          const minRange = Math.min(rangeStart, rangeEnd);
-          const maxRange = Math.max(rangeStart, rangeEnd);
-          const nextSelectedIds = orderedItems.reduce(
-            (acc: LibraryItem["id"][], item, idx) => {
-              if (
-                (idx >= minRange && idx <= maxRange) ||
-                selectedItemsMap.has(item.id)
-              ) {
-                acc.push(item.id);
-              }
-              return acc;
-            },
-            [],
-          );
-          onSelectItems(nextSelectedIds);
-        } else {
-          onSelectItems([...selectedItems, id]);
-        }
-        setLastSelectedItem(id);
-      } else {
+      if (selectedItems.includes(id)) {
         setLastSelectedItem(null);
         onSelectItems(selectedItems.filter((_id) => _id !== id));
+        return;
       }
+
+      setLastSelectedItem(id);
+      if (event.shiftKey && lastSelectedItem) {
+        const orderedItems = IS_SEARCHING
+          ? filteredItems
+          : [...unpublishedItems, ...publishedItems];
+        const rangeStart = orderedItems.findIndex(
+          (item) => item.id === lastSelectedItem,
+        );
+        const rangeEnd = orderedItems.findIndex((item) => item.id === id);
+
+        if (rangeStart !== -1 && rangeEnd !== -1) {
+          const rangeIds = orderedItems
+            .slice(
+              Math.min(rangeStart, rangeEnd),
+              Math.max(rangeStart, rangeEnd) + 1,
+            )
+            .map((item) => item.id);
+          onSelectItems([...new Set([...selectedItems, ...rangeIds])]);
+          return;
+        }
+      }
+
+      onSelectItems([...selectedItems, id]);
     },
     [
+      IS_SEARCHING,
+      filteredItems,
       lastSelectedItem,
       onSelectItems,
       publishedItems,
